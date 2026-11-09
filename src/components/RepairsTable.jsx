@@ -1,18 +1,29 @@
 import { useState, useMemo, Fragment } from 'react';
 
-export default function RepairsTable({ repairs, onDelete, onExport }) {
+export default function RepairsTable({ repairs, onDelete, onEdit, onDuplicate, onExport }) {
   const [sortField, setSortField] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
   const [expandedId, setExpandedId] = useState(null);
+  const [search, setSearch] = useState("");
 
-  const sorted = useMemo(() => {
-    return [...repairs].sort((a, b) => {
+  const filteredAndSorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q
+      ? repairs.filter(r =>
+          (r.rateName || "").toLowerCase().includes(q) ||
+          (r.address || "").toLowerCase().includes(q) ||
+          (r.master || "").toLowerCase().includes(q) ||
+          (r.executor || "").toLowerCase().includes(q)
+        )
+      : repairs;
+
+    return [...list].sort((a, b) => {
       const va = a[sortField] || "";
       const vb = b[sortField] || "";
       if (sortDir === "asc") return va > vb ? 1 : -1;
       return va < vb ? 1 : -1;
     });
-  }, [repairs, sortField, sortDir]);
+  }, [repairs, sortField, sortDir, search]);
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -27,17 +38,29 @@ export default function RepairsTable({ repairs, onDelete, onExport }) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 fade-in">
       <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-gray-800">
-          Записи за период <span className="text-blue-600">({repairs.length})</span>
+          Записи за период <span className="text-blue-600">({filteredAndSorted.length})</span>
         </h3>
-        <button onClick={onExport}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V16a2 2 0 01-2 2z"/>
-          </svg>
-          Скачать в Excel
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            placeholder="Поиск по работе, адресу, мастеру..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64"
+          />
+          <button
+            onClick={onExport}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V16a2 2 0 01-2 2z"/>
+            </svg>
+            Скачать в Excel
+          </button>
+        </div>
       </div>
-      {sorted.length === 0 ? (
+
+      {filteredAndSorted.length === 0 ? (
         <div className="p-10 text-center text-gray-400">
           <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -49,43 +72,77 @@ export default function RepairsTable({ repairs, onDelete, onExport }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("date")}>Дата<SortIcon field="date"/></th>
-                <th className="px-3 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("rateCode")}>Шифр<SortIcon field="rateCode"/></th>
-                <th className="px-3 py-3 text-left font-semibold text-gray-600">Наименование</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("date")}>
+                  Дата<SortIcon field="date"/>
+                </th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("rateName")}>
+                  Наименование работы<SortIcon field="rateName"/>
+                </th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-600">Ед.</th>
-                <th className="px-3 py-3 text-right font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("volume")}>Объём<SortIcon field="volume"/></th>
-                <th className="px-3 py-3 text-left font-semibold text-gray-600">Адрес</th>
+                <th className="px-3 py-3 text-right font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("volume")}>
+                  Объём<SortIcon field="volume"/>
+                </th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:text-blue-600" onClick={() => toggleSort("address")}>
+                  Адрес<SortIcon field="address"/>
+                </th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-600">Место</th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-600">Мастер</th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-600">Исполнитель</th>
                 <th className="px-3 py-3 text-center font-semibold text-gray-600">Мат.</th>
-                <th className="px-3 py-3 text-center font-semibold text-gray-600">⚙</th>
+                <th className="px-3 py-3 text-center font-semibold text-gray-600">Действия</th>
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r, i) => (
+              {filteredAndSorted.map((r, i) => (
                 <Fragment key={r.id || i}>
                   <tr className="border-t border-gray-50 hover:bg-blue-50/30 transition-colors">
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.date}</td>
-                    <td className="px-3 py-2.5 font-mono text-blue-700 font-semibold whitespace-nowrap">{r.rateCode}</td>
-                    <td className="px-3 py-2.5 text-gray-700 max-w-xs truncate" title={r.rateName}>{r.rateName}</td>
+                    <td className="px-3 py-2.5 text-gray-800 font-medium max-w-sm" title={r.rateName}>{r.rateName}</td>
                     <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{r.rateUnit}</td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-800">{r.volume}</td>
-                    <td className="px-3 py-2.5 text-gray-700 max-w-[150px] truncate" title={r.address}>{r.address}</td>
-                    <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.workPlace}</td>
+                    <td className="px-3 py-2.5 text-gray-700 max-w-[160px] truncate" title={r.address}>{r.address}</td>
+                    <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.workPlace || "—"}</td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.master}</td>
-                    <td className="px-3 py-2.5 text-gray-600 max-w-[120px] truncate" title={r.executor}>{r.executor}</td>
+                    <td className="px-3 py-2.5 text-gray-600 max-w-[130px] truncate" title={r.executor}>{r.executor}</td>
                     <td className="px-3 py-2.5 text-center">
                       {r.materials && r.materials.length > 0 ? (
-                        <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                          className="text-orange-600 hover:text-orange-700 font-semibold text-xs bg-orange-50 px-2 py-1 rounded">
+                        <button
+                          onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                          className="text-orange-600 hover:text-orange-700 font-semibold text-xs bg-orange-50 px-2 py-1 rounded"
+                        >
                           {r.materials.length} шт.
                         </button>
                       ) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <button onClick={() => onDelete(r.id)} className="text-red-400 hover:text-red-600 transition-colors" title="Удалить">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(r)}
+                          className="text-blue-500 hover:text-blue-700 mr-2 transition-colors"
+                          title="Редактировать"
+                        >
+                          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                          </svg>
+                        </button>
+                      )}
+                      {onDuplicate && (
+                        <button
+                          onClick={() => onDuplicate(r)}
+                          className="text-emerald-600 hover:text-emerald-800 mr-2 transition-colors"
+                          title="Дублировать строку"
+                        >
+                          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onDelete(r.id)}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                        title="Удалить"
+                      >
+                        <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
                       </button>
@@ -93,7 +150,7 @@ export default function RepairsTable({ repairs, onDelete, onExport }) {
                   </tr>
                   {expandedId === r.id && r.materials && r.materials.length > 0 && (
                     <tr>
-                      <td colSpan="11" className="bg-orange-50/50 px-6 py-3">
+                      <td colSpan="10" className="bg-orange-50/50 px-6 py-3">
                         <div className="text-xs font-semibold text-orange-700 mb-2">Списанные материалы:</div>
                         <table className="w-full text-xs">
                           <thead>

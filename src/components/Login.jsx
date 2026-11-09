@@ -3,10 +3,10 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
-const ADMIN_EMAIL = "admin@zheu1.by"; // главный админ — профиль создастся сам
+const ADMIN_EMAIL = "admin@zheu1.by";
 
 export default function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState("");
+  const [loginInput, setLoginInput] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,40 +15,72 @@ export default function LoginScreen({ onLogin }) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const mail = email.trim().toLowerCase();
+    const input = loginInput.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
     try {
-      // 1) проверяем пароль в Firebase Authentication
-      await signInWithEmailAndPassword(auth, mail, pass);
+      // 1) Сначала ищем пользователя в коллекции users (по email или по логину)
+      const usersSnap = await getDocs(collection(db, "users"));
+      const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const matchedUser = allUsers.find(
+        u => u.email?.toLowerCase() === input || u.username?.toLowerCase() === input
+      );
 
-      // 2) ищем профиль в Firestore по email
-      const q = query(collection(db, "users"), where("email", "==", mail));
-      const snap = await getDocs(q);
-
-      if (snap.empty) {
-        // 2a) если это ГЛАВНЫЙ АДМИН и профиля ещё нет — создаём его автоматически
-        if (mail === ADMIN_EMAIL) {
-          const ref = await addDoc(collection(db, "users"), {
-            email: mail,
-            fullName: "Администратор системы",
-            role: "admin",
-            zhes: null,
-            createdAt: new Date().toISOString()
-          });
-          onLogin({ id: ref.id, email: mail, fullName: "Администратор системы", role: "admin", zhes: null });
+      // Если у пользователя в Админке задан или изменён пароль — проверяем его
+      if (matchedUser && matchedUser.password) {
+        if (matchedUser.password === cleanPass) {
+          try {
+            await signInWithEmailAndPassword(auth, matchedUser.email, cleanPass);
+          } catch {
+            // Если пароль менялся через Админку, в Firestore он уже новый, пускаем пользователя
+          }
+          onLogin(matchedUser);
+          return;
+        } else {
+          setError("Неверный логин или пароль");
+          setLoading(false);
           return;
         }
-        // 2b) для остальных — просим создать через админку
-        setError("Профиль не найден. Войдите как админ и создайте этого пользователя в разделе «Админка» (email должен точно совпадать с email для входа).");
-        await auth.signOut();
+      }
+
+      // 2) Стандартная проверка через Firebase Authentication (для главного админа или старых аккаунтов)
+      const emailToAuth = matchedUser ? matchedUser.email : input;
+      await signInWithEmailAndPassword(auth, emailToAuth, cleanPass);
+
+      if (matchedUser) {
+        onLogin(matchedUser);
         return;
       }
 
-      onLogin({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      // 3) Если это главный админ и его ещё нет в коллекции users — создаём автоматически
+      if (emailToAuth === ADMIN_EMAIL) {
+        const ref = await addDoc(collection(db, "users"), {
+          username: "admin",
+          email: ADMIN_EMAIL,
+          password: cleanPass,
+          fullName: "Администратор системы",
+          role: "admin",
+          zhes: null,
+          createdAt: new Date().toISOString()
+        });
+        onLogin({
+          id: ref.id,
+          username: "admin",
+          email: ADMIN_EMAIL,
+          fullName: "Администратор системы",
+          role: "admin",
+          zhes: null
+        });
+        return;
+      }
+
+      setError("Профиль не найден. Создайте этого пользователя в разделе «Админка».");
+      await auth.signOut();
     } catch (err) {
       const c = err.code || "";
-      if (c.includes("auth/")) setError("Неверный email или пароль");
+      if (c.includes("auth/")) setError("Неверный логин/email или пароль");
       else if (c.includes("permission-denied")) setError("Нет доступа к базе — проверьте правила Firestore");
-      else setError("Ошибка: " + (err.message || c));
+      else setError("Ошибка входа: проверьте правильность логина и пароля");
       console.error("LOGIN:", c, err);
     } finally {
       setLoading(false);
@@ -69,20 +101,34 @@ export default function LoginScreen({ onLogin }) {
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" required
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email или Логин</label>
+            <input
+              type="text"
+              required
+              placeholder="admin@zheu1.by или логин"
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" />
+              value={loginInput}
+              onChange={e => setLoginInput(e.target.value)}
+              autoComplete="username"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
-            <input type="password" required
+            <input
+              type="password"
+              required
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={pass} onChange={e => setPass(e.target.value)} autoComplete="current-password" />
+              value={pass}
+              onChange={e => setPass(e.target.value)}
+              autoComplete="current-password"
+            />
           </div>
           {error && <p className="text-red-500 text-sm text-center bg-red-50 rounded-lg p-2">{error}</p>}
-          <button type="submit" disabled={loading}
-            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
             {loading ? "Входим..." : "Войти"}
           </button>
         </form>

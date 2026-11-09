@@ -8,7 +8,7 @@ export default function ManagerDashboard() {
   const [selYear, setSelYear] = useState(new Date().getFullYear());
   const [selMonth, setSelMonth] = useState(new Date().getMonth() + 1);
   const [allRepairs, setAllRepairs] = useState([]);
-  const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - 2 + i);
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
 
   useEffect(() => {
     loadAllRepairs();
@@ -32,44 +32,48 @@ export default function ManagerDashboard() {
     const map = {};
     allRepairs.forEach(r => {
       if (!map[r.zhes]) map[r.zhes] = {};
-      const key = r.rateCode;
+      const key = `${(r.rateName || "").trim()}___${(r.rateUnit || "").trim()}`;
       if (!map[r.zhes][key]) {
-        map[r.zhes][key] = { code: r.rateCode, name: r.rateName, unit: r.rateUnit, total: 0, count: 0 };
+        map[r.zhes][key] = { name: r.rateName, unit: r.rateUnit, total: 0, count: 0 };
       }
-      map[r.zhes][key].total += r.volume;
+      map[r.zhes][key].total += Number(r.volume) || 0;
       map[r.zhes][key].count += 1;
     });
     return map;
   }, [allRepairs]);
 
-  const allCodes = useMemo(() => {
-    const codes = new Set();
-    allRepairs.forEach(r => codes.add(r.rateCode));
-    return [...codes].sort();
+  const allKeys = useMemo(() => {
+    const keys = new Set();
+    allRepairs.forEach(r => {
+      keys.add(`${(r.rateName || "").trim()}___${(r.rateUnit || "").trim()}`);
+    });
+    return [...keys].sort();
   }, [allRepairs]);
 
   const handleExportSummary = () => {
     if (!allRepairs.length) { alert("Нет данных"); return; }
     const wb = XLSX.utils.book_new();
-    const header = ["Шифр", "Наименование", "Ед.изм.", ...ZHEU_LIST.map(z => z.replace("ЖЭС-", "ЖЭС №")), "Итого"];
-    const rows = allCodes.map(code => {
-      const row = [code, "", "", ...ZHEU_LIST.map(() => ""), 0];
+    const header = ["№", "Наименование работы", "Ед.изм.", ...ZHEU_LIST.map(z => z.replace("ЖЭС-", "ЖЭС №")), "Итого"];
+    const rows = allKeys.map((key, idx) => {
+      const row = [idx + 1, "", "", ...ZHEU_LIST.map(() => ""), 0];
       let total = 0;
       ZHEU_LIST.forEach((z, zi) => {
-        const entry = summary[z]?.[code];
+        const entry = summary[z]?.[key];
         if (entry) {
-          row[1] = entry.name; row[2] = entry.unit;
-          row[3 + zi] = entry.total; total += entry.total;
+          row[1] = entry.name;
+          row[2] = entry.unit;
+          row[3 + zi] = Number(entry.total.toFixed(2));
+          total += entry.total;
         }
       });
-      row[row.length - 1] = total;
+      row[row.length - 1] = Number(total.toFixed(2));
       return row;
     });
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    ws['!cols'] = [{wch:14},{wch:45},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12}];
+    ws['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
     ws['!autofilter'] = { ref: `A1:${String.fromCharCode(64 + header.length)}${rows.length + 1}` };
     XLSX.utils.book_append_sheet(wb, ws, "Сводная");
-    XLSX.writeFile(wb, `Сводная_${MONTHS[selMonth-1]}_${selYear}.xlsx`);
+    XLSX.writeFile(wb, `Сводная_${MONTHS[selMonth - 1]}_${selYear}.xlsx`);
   };
 
   return (
@@ -93,7 +97,7 @@ export default function ManagerDashboard() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Месяц</label>
             <select value={selMonth} onChange={e => setSelMonth(parseInt(e.target.value))}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-              {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+              {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
           </div>
           <button onClick={handleExportSummary}
@@ -111,8 +115,8 @@ export default function ManagerDashboard() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-purple-50">
-                  <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Шифр</th>
-                  <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Наименование</th>
+                  <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">№</th>
+                  <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Наименование работы</th>
                   <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Ед.</th>
                   {ZHEU_LIST.map(z => (
                     <th key={z} className="px-3 py-3 text-center font-semibold text-purple-800 border border-purple-100">{z}</th>
@@ -121,17 +125,17 @@ export default function ManagerDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {allCodes.map(code => {
+                {allKeys.map((key, idx) => {
                   let total = 0;
-                  const firstEntry = ZHEU_LIST.map(z => summary[z]?.[code]).find(Boolean);
+                  const firstEntry = ZHEU_LIST.map(z => summary[z]?.[key]).find(Boolean);
                   return (
-                    <tr key={code} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 font-mono text-blue-700 font-semibold border border-gray-100 whitespace-nowrap">{code}</td>
-                      <td className="px-3 py-2 text-gray-700 border border-gray-100 max-w-xs">{firstEntry?.name || ""}</td>
+                    <tr key={key} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-500 border border-gray-100">{idx + 1}</td>
+                      <td className="px-3 py-2 text-gray-800 font-medium border border-gray-100 max-w-md">{firstEntry?.name || ""}</td>
                       <td className="px-3 py-2 text-gray-500 border border-gray-100 whitespace-nowrap">{firstEntry?.unit || ""}</td>
                       {ZHEU_LIST.map(z => {
-                        const entry = summary[z]?.[code];
-                        const val = entry ? entry.total : "";
+                        const entry = summary[z]?.[key];
+                        const val = entry ? Number(entry.total.toFixed(2)) : "";
                         total += entry ? entry.total : 0;
                         return (
                           <td key={z} className={`px-3 py-2 text-center border border-gray-100 font-semibold ${val ? "text-gray-800" : "text-gray-300"}`}>
@@ -139,7 +143,9 @@ export default function ManagerDashboard() {
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2 text-center border border-gray-100 font-bold text-purple-800 bg-purple-50">{total || "—"}</td>
+                      <td className="px-3 py-2 text-center border border-gray-100 font-bold text-purple-800 bg-purple-50">
+                        {total ? Number(total.toFixed(2)) : "—"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -151,7 +157,7 @@ export default function ManagerDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {ZHEU_LIST.map(z => {
           const count = allRepairs.filter(r => r.zhes === z).length;
-          const totalVol = allRepairs.filter(r => r.zhes === z).reduce((s, r) => s + r.volume, 0);
+          const totalVol = allRepairs.filter(r => r.zhes === z).reduce((s, r) => s + (Number(r.volume) || 0), 0);
           return (
             <div key={z} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
               <div className="text-sm font-semibold text-gray-500">{z}</div>
