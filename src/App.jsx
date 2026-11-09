@@ -178,7 +178,7 @@ export default function App() {
         )}
 
         {activeTab === "kazna" && (
-          <KaznaOborot user={user} kazna={kazna} selZhes={selZhes} selYear={selYear} selMonth={selMonth} onRefresh={loadData} />
+          <KaznaOborot user={user} kazna={kazna} selZhes={selZhes} setSelZhes={setSelZhes} selYear={selYear} selMonth={selMonth} onRefresh={loadData} />
         )}
 
         {activeTab === "manager" && user.role === "admin" && (

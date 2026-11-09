@@ -90,7 +90,7 @@ export default function RepairForm({ rates, zhes, year, month, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.rateCode || !form.volume || !form.address || !form.master || !form.executor) {
+    if (!form.rateName || !form.rateUnit || !form.volume || !form.address || !form.master || !form.executor) {
       alert("Заполните все обязательные поля!");
       return;
     }
@@ -135,23 +135,25 @@ export default function RepairForm({ rates, zhes, year, month, onSave }) {
         </svg>
         Добавить работу
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Код расценки (шифр) *</label>
-          <AutocompleteSelect rates={rates} value={form.rateCode}
-            onChange={v => setForm(f => ({ ...f, rateCode: v }))}
-            onSelect={handleRateSelect} />
-        </div>
-        <div className="lg:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Наименование работы</label>
-          <input type="text" readOnly value={form.rateName}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ед. измерения</label>
-          <input type="text" readOnly value={form.rateUnit}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700" />
-        </div>
+	<div className="lg:col-span-2">
+	  <label className="block text-sm font-medium text-gray-700 mb-1">Наименование работы *</label>
+	  <input 
+	    type="text" 
+	    value={form.rateName}
+	    onChange={e => setForm(f => ({ ...f, rateName: e.target.value }))}
+	    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+	  />
+	</div>
+
+	<div>
+	  <label className="block text-sm font-medium text-gray-700 mb-1">Ед. измерения *</label>
+	  <input 
+	    type="text" 
+	    value={form.rateUnit}
+	    onChange={e => setForm(f => ({ ...f, rateUnit: e.target.value }))}
+	    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+	  />
+	</div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Объём работ *</label>
           <input type="number" step="0.01" min="0" value={form.volume}
