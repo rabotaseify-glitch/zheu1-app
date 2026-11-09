@@ -104,9 +104,21 @@ export default function KaznaOborot({ user, kazna, selZhes, setSelZhes, selYear,
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="flex flex-wrap items-end gap-4">
           {user?.role === "master" ? (
+{user?.role === "master" ? (
   <div className="px-4 py-2.5 bg-purple-50 text-purple-800 rounded-lg font-semibold text-sm">
     {user?.zhes}
   </div>
+) : (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">ЖЭС</label>
+    <select
+      value={selZhes}
+      onChange={e => setSelZhes(e.target.value)}
+      className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-purple-500 outline-none bg-purple-50 text-purple-800">
+      {ZHEU_LIST.map(z => <option key={z} value={z}>{z}</option>)}
+    </select>
+  </div>
+)}
 ) : (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">ЖЭС</label>
