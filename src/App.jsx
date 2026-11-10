@@ -46,6 +46,7 @@ export default function App() {
     const effectiveZhes = user?.role === "master" ? user?.zhes : selZhes;
 
     try {
+      // 1. Загрузка работ по текущему ремонту (по ЖЭС, году и месяцу)
       const repairsQuery = query(
         collection(db, "repairs"),
         where("zhes", "==", effectiveZhes),
@@ -55,14 +56,15 @@ export default function App() {
       const repairsSnap = await getDocs(repairsQuery);
       setRepairs(repairsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      const kaznaQuery = query(
-        collection(db, "kazna"),
-        where("zhes", "==", effectiveZhes),
-        where("year", "==", selYear),
-        where("month", "==", selMonth)
-      );
-      const kaznaSnap = await getDocs(kaznaQuery);
-      setKazna(kaznaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // 2. Загрузка казны оборота — сразу за весь выбранный год по всему ЖЭУ-1
+      if (user?.role !== "master") {
+        const kaznaQuery = query(
+          collection(db, "kazna"),
+          where("year", "==", selYear)
+        );
+        const kaznaSnap = await getDocs(kaznaQuery);
+        setKazna(kaznaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
     } catch (err) {
       console.error("Ошибка загрузки данных:", err);
     }
@@ -108,15 +110,17 @@ export default function App() {
 
   if (!user) return <LoginScreen onLogin={handleSetUser} />;
 
+  // Права доступа: у сметчика права как у админа, у мастера — только внесение данных
   const tabs = [
-    { id: "data", label: "📋 Внесение данных", roles: ["admin", "master"] },
-    { id: "kazna", label: "💰 Казна оборот", roles: ["admin", "smetchik", "master"] },
-    { id: "manager", label: "📊 Сводная", roles: ["admin"] },
-    { id: "admin", label: "⚙ Админка", roles: ["admin"] },
+    { id: "data", label: "📋 Внесение данных", roles: ["admin", "smetchik", "master"] },
+    { id: "kazna", label: "💰 Казна оборот", roles: ["admin", "smetchik"] },
+    { id: "manager", label: "📊 Сводная", roles: ["admin", "smetchik"] },
+    { id: "admin", label: "⚙ Админка", roles: ["admin", "smetchik"] },
   ];
   const availableTabs = tabs.filter(t => t.roles.includes(user.role));
 
   const effectiveZhes = user?.role === "master" ? user?.zhes : selZhes;
+  const hasFullAccess = user.role === "admin" || user.role === "smetchik";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -153,7 +157,7 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === "data" && user.role !== "smetchik" && (
+        {activeTab === "data" && (
           <div className="space-y-5">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 fade-in">
               <div className="flex flex-wrap items-end gap-4">
@@ -211,26 +215,21 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === "kazna" && (
+        {activeTab === "kazna" && hasFullAccess && (
           <KaznaOborot
-            user={user}
             kazna={kazna}
-            selZhes={selZhes}
-            setSelZhes={setSelZhes}
             selYear={selYear}
             setSelYear={setSelYear}
-            selMonth={selMonth}
-            setSelMonth={setSelMonth}
             years={years}
             onRefresh={loadData}
           />
         )}
 
-        {activeTab === "manager" && user.role === "admin" && (
+        {activeTab === "manager" && hasFullAccess && (
           <ManagerDashboard />
         )}
 
-        {activeTab === "admin" && user.role === "admin" && (
+        {activeTab === "admin" && hasFullAccess && (
           <AdminPanel />
         )}
       </main>
