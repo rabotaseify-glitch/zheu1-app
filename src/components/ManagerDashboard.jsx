@@ -34,10 +34,19 @@ export default function ManagerDashboard() {
       if (!map[r.zhes]) map[r.zhes] = {};
       const key = `${(r.rateName || "").trim()}___${(r.rateUnit || "").trim()}`;
       if (!map[r.zhes][key]) {
-        map[r.zhes][key] = { name: r.rateName, unit: r.rateUnit, total: 0, count: 0 };
+        map[r.zhes][key] = {
+          name: r.rateName,
+          unit: r.rateUnit,
+          total: 0,
+          count: 0,
+          addresses: new Set()
+        };
       }
       map[r.zhes][key].total += Number(r.volume) || 0;
       map[r.zhes][key].count += 1;
+      if (r.address && r.address.trim()) {
+        map[r.zhes][key].addresses.add(r.address.trim());
+      }
     });
     return map;
   }, [allRepairs]);
@@ -53,24 +62,46 @@ export default function ManagerDashboard() {
   const handleExportSummary = () => {
     if (!allRepairs.length) { alert("Нет данных"); return; }
     const wb = XLSX.utils.book_new();
-    const header = ["№", "Наименование работы", "Ед.изм.", ...ZHEU_LIST.map(z => z.replace("ЖЭС-", "ЖЭС №")), "Итого"];
+    const header = [
+      "№",
+      "Наименование работы",
+      "Ед.изм.",
+      "Адреса объектов",
+      ...ZHEU_LIST.map(z => z.replace("ЖЭС-", "ЖЭС №")),
+      "Итого"
+    ];
     const rows = allKeys.map((key, idx) => {
-      const row = [idx + 1, "", "", ...ZHEU_LIST.map(() => ""), 0];
+      const row = [idx + 1, "", "", "", ...ZHEU_LIST.map(() => ""), 0];
       let total = 0;
+      const addrSet = new Set();
+
       ZHEU_LIST.forEach((z, zi) => {
         const entry = summary[z]?.[key];
         if (entry) {
           row[1] = entry.name;
           row[2] = entry.unit;
-          row[3 + zi] = Number(entry.total.toFixed(2));
+          row[4 + zi] = Number(entry.total.toFixed(2));
           total += entry.total;
+          entry.addresses.forEach(a => addrSet.add(a));
         }
       });
+
+      row[3] = [...addrSet].join("; ");
       row[row.length - 1] = Number(total.toFixed(2));
       return row;
     });
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    ws['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 45 },
+      { wch: 10 },
+      { wch: 40 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 }
+    ];
     ws['!autofilter'] = { ref: `A1:${String.fromCharCode(64 + header.length)}${rows.length + 1}` };
     XLSX.utils.book_append_sheet(wb, ws, "Сводная");
     XLSX.writeFile(wb, `Сводная_${MONTHS[selMonth - 1]}_${selYear}.xlsx`);
@@ -118,6 +149,7 @@ export default function ManagerDashboard() {
                   <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">№</th>
                   <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Наименование работы</th>
                   <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Ед.</th>
+                  <th className="px-3 py-3 text-left font-semibold text-purple-800 border border-purple-100">Адреса объектов</th>
                   {ZHEU_LIST.map(z => (
                     <th key={z} className="px-3 py-3 text-center font-semibold text-purple-800 border border-purple-100">{z}</th>
                   ))}
@@ -128,11 +160,20 @@ export default function ManagerDashboard() {
                 {allKeys.map((key, idx) => {
                   let total = 0;
                   const firstEntry = ZHEU_LIST.map(z => summary[z]?.[key]).find(Boolean);
+                  const allAddresses = new Set();
+                  ZHEU_LIST.forEach(z => {
+                    summary[z]?.[key]?.addresses?.forEach(a => allAddresses.add(a));
+                  });
+                  const addressesStr = [...allAddresses].join("; ");
+
                   return (
                     <tr key={key} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-gray-500 border border-gray-100">{idx + 1}</td>
                       <td className="px-3 py-2 text-gray-800 font-medium border border-gray-100 max-w-md">{firstEntry?.name || ""}</td>
                       <td className="px-3 py-2 text-gray-500 border border-gray-100 whitespace-nowrap">{firstEntry?.unit || ""}</td>
+                      <td className="px-3 py-2 text-gray-600 border border-gray-100 max-w-xs truncate" title={addressesStr}>
+                        {addressesStr || "—"}
+                      </td>
                       {ZHEU_LIST.map(z => {
                         const entry = summary[z]?.[key];
                         const val = entry ? Number(entry.total.toFixed(2)) : "";
